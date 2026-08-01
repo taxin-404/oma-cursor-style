@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Open the cursor style picker.
+
+omarchy-shell shell toggle taxin.cursor-style

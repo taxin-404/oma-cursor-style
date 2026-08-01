@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Show the current cursor theme.
+#
+# The cursor theme is persisted as HYPRCURSOR_THEME in the Hyprland config.
+config_file="$HOME/.config/hypr/hyprland.lua"
+
+if [[ -f $config_file ]]; then
+  theme=$(sed -n 's/.*HYPRCURSOR_THEME", *"\([^"]*\)".*/\1/p' "$config_file" | head -n1)
+  if [[ -n $theme ]]; then
+    echo "$theme"
+    exit 0
+  fi
+fi
+
+# Fall back to the running session value.
+if [[ -n ${HYPRCURSOR_THEME:-} ]]; then
+  echo "$HYPRCURSOR_THEME"
+  exit 0
+fi
