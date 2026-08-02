@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# omarchy:summary=Install the Cursor Style row into the Omarchy menu
+# omarchy:group=menu
+#
+# Adds the Style > Cursor Style row to the user menu extension
+# (~/.config/omarchy/extensions/omarchy-menu.jsonc), which the Omarchy menu
+# merges live. The plugin owns its menu entry so it survives core upgrades:
+# this file lives in the user's config, not in the shipped defaults.
+#
+# Idempotent: never touches an existing row with the same id, so a user (or
+# another source) that already defines style.cursor-style keeps its version.
+
+set -euo pipefail
+
+EXT="${OMARCHY_MENU_EXTENSION:-$HOME/.config/omarchy/extensions/omarchy-menu.jsonc}"
+ROW_ID='style.cursor-style'
+
+usage() {
+  echo "Usage: omarchy-cursor-menu-install"
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+esac
+
+mkdir -p "$(dirname "$EXT")"
+
+if [[ ! -f $EXT ]]; then
+  cat >"$EXT" <<EOF
+{
+  // Rows added by the cursor-style plugin so the picker is reachable from the
+  // Omarchy menu. Remove this block if you want the entry gone.
+  "$ROW_ID": {"icon":"󰇀","label":"Cursor Style","aliases":["cursor","cursor-picker"],"action":"omarchy-shell shell toggle taxin.cursor-style"}
+}
+EOF
+  exit 0
+fi
+
+# Strip //-style comments for analysis only; never rewrite the original bytes.
+stripped=$(sed -E 's@^\s*//.*@@' "$EXT")
+
+# Already present? Leave it alone.
+if printf '%s\n' "$stripped" | grep -q "\"$ROW_ID\""; then
+  exit 0
+fi
+
+row='  "'"$ROW_ID"'": {"icon":"󰇀","label":"Cursor Style","aliases":["cursor","cursor-picker"],"action":"omarchy-shell shell toggle taxin.cursor-style"}'
+
+# Find the line of the final closing brace and insert before it.
+line=$(grep -n '^}' "$EXT" | tail -n 1 | cut -d: -f1)
+if [[ -z $line ]]; then
+  printf '%s\n' "$row" >>"$EXT"
+  exit 0
+fi
+
+# Walk up from the closing brace to the last content line (skipping blanks and
+# comment-only lines). If that line is the opening brace the object is empty;
+# otherwise it is the last entry, which must gain a comma before the new row.
+prev=$((line - 1))
+while (( prev > 0 )); do
+  content=$(sed -n "${prev}p" "$EXT")
+  trimmed=$(printf '%s' "$content" | sed 's@^[[:space:]]*@@')
+  if [[ -n $trimmed && ${trimmed:0:1} != "/" ]]; then
+    break
+  fi
+  prev=$((prev - 1))
+done
+
+if [[ $prev -gt 0 ]]; then
+  last_trimmed=$(printf '%s' "$(sed -n "${prev}p" "$EXT")" | sed 's@[[:space:]]*$@@')
+  if [[ $last_trimmed != "{" && ${last_trimmed: -1} != "," ]]; then
+    sed -i "${prev}s/\$/,/" "$EXT"
+  fi
+  sed -i "${line}i\\$row" "$EXT"
+else
+  sed -i "${line}i\\$row" "$EXT"
+fi

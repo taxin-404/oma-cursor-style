@@ -59,7 +59,7 @@ Item {
 
   function listScript() {
     if (root.sizeMode)
-      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done"
+      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); { " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done; printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\"; }"
     return "current=$(" + root.tool("omarchy-cursor-current") + " 2>/dev/null); " + root.tool("omarchy-cursor-list") + " 2>/dev/null | while read -r c; do [[ -z $c ]] && continue; printf '%s\\t%s\\t%s\\n' \"$c\" \"$c\" \"$current\"; done"
   }
 
@@ -133,10 +133,16 @@ Item {
   function activateIndex(index) {
     if (index < 0 || index >= root.filtered.length) return
     var row = root.filtered[index]
-    if (root.sizeMode)
+    if (root.sizeMode) {
+      if (row.value === "custom") {
+        Util.execDetached(root.tool("omarchy-cursor-size-custom"))
+        root.reload()
+        return
+      }
       Util.execDetached(root.tool("omarchy-cursor-size-set") + " " + Util.shellQuote(row.value))
-    else
+    } else {
       Util.execDetached(root.tool("omarchy-cursor-set") + " " + Util.shellQuote(row.value))
+    }
     root.currentValue = row.value
     root.rebuildDisplay()
   }
@@ -442,6 +448,15 @@ Item {
           }
         }
       }
+    }
+  }
+
+  // Self-install the menu row into the user's menu extension. The plugin owns
+  // its menu entry so it survives core upgrades; keepLoaded mounts this overlay
+  // at shell startup, so the row appears as soon as the plugin is enabled.
+  Component.onCompleted: {
+    if (root.pluginBin) {
+      Util.execDetached(root.tool("omarchy-cursor-menu-install"))
     }
   }
 }

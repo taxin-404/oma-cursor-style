@@ -53,6 +53,15 @@ printf '%s\n' "$*" >>"$HOOK_LOG"
 EOF
 chmod +x "$tmp_dir/bin/omarchy-hook"
 
+cat >"$tmp_dir/bin/omarchy-menu-input" <<'EOF'
+#!/bin/bash
+if [[ -z ${MENU_INPUT_VALUE+x} ]]; then
+  exit 1
+fi
+printf '%s' "$MENU_INPUT_VALUE"
+EOF
+chmod +x "$tmp_dir/bin/omarchy-menu-input"
+
 export PATH="$tmp_dir/bin:$PLUGIN_DIR/bin:$PATH"
 export HOME="$tmp_dir/home"
 export DBUS_SESSION_BUS_ADDRESS="test"
@@ -127,9 +136,53 @@ if omarchy-cursor-size-set abc; then
 fi
 pass "cursor size rejects non-numeric sizes"
 
+MENU_INPUT_VALUE=55 omarchy-cursor-size-custom
+
+[[ $(tail -n 1 "$HYPRCTL_LOG") == "setcursor Fake-Dark 55" ]] ||
+  fail "custom size applies the typed value" "$(tail -n 1 "$HYPRCTL_LOG")"
+pass "custom size applies the typed value"
+
+rg -q 'XCURSOR_SIZE", "55"' "$HOME/.config/hypr/hyprland.lua" &&
+  rg -q 'HYPRCURSOR_SIZE", "55"' "$HOME/.config/hypr/hyprland.lua" ||
+  fail "custom size persists both env variables"
+pass "custom size persists both env variables"
+
+tail -n 2 "$GSETTINGS_LOG" | rg -q 'cursor-size 55' ||
+  fail "custom size syncs gsettings"
+pass "custom size syncs gsettings"
+
+tail -n 1 "$HOOK_LOG" | rg -q 'cursor-size-set 55' ||
+  fail "custom size runs the size hook"
+pass "custom size runs the size hook"
+
+if MENU_INPUT_VALUE=abc omarchy-cursor-size-custom; then
+  fail "custom size rejects non-numeric input"
+fi
+pass "custom size rejects non-numeric input"
+
+tail -n 1 "$NOTIFY_LOG" | rg -q 'Invalid cursor size' &&
+  tail -n 1 "$NOTIFY_LOG" | rg -q 'abc' ||
+  fail "custom size notifies on invalid input"
+pass "custom size notifies on invalid input"
+
+[[ $(tail -n 1 "$HYPRCTL_LOG") == "setcursor Fake-Dark 55" ]] ||
+  fail "custom size leaves state unchanged on invalid input" "$(tail -n 1 "$HYPRCTL_LOG")"
+pass "custom size leaves state unchanged on invalid input"
+
+if MENU_INPUT_VALUE=0 omarchy-cursor-size-custom; then
+  fail "custom size rejects zero"
+fi
+pass "custom size rejects zero"
+
+unset MENU_INPUT_VALUE
+if omarchy-cursor-size-custom; then
+  fail "custom size aborts when the prompt is cancelled"
+fi
+pass "custom size aborts when the prompt is cancelled"
+
 omarchy-cursor-set Fake-Dark
 
-[[ $(tail -n 1 "$HYPRCTL_LOG") == "setcursor Fake-Dark 32" ]] ||
+[[ $(tail -n 1 "$HYPRCTL_LOG") == "setcursor Fake-Dark 55" ]] ||
   fail "cursor theme applies the theme" "$(tail -n 1 "$HYPRCTL_LOG")"
 pass "cursor theme applies the theme"
 
@@ -167,18 +220,63 @@ pass "overlay resolves its bundled scripts from manifest.__sourceDir"
 for script in \
   omarchy-cursor-list omarchy-cursor-current omarchy-cursor-set \
   omarchy-cursor-size-list omarchy-cursor-size-current omarchy-cursor-size-set \
-  omarchy-cursor-open; do
+  omarchy-cursor-size-custom omarchy-cursor-menu-install omarchy-cursor-open; do
   [[ -x "$PLUGIN_DIR/bin/$script" ]] ||
     fail "bundled script is executable: $script"
 done
 pass "all bundled scripts are executable"
 
-# The menu.jsonc contribution is what makes `omarchy plugin enable` surface the
-# picker under Style. It must parse and target the plugin overlay.
-jq -r '.["style.cursor-style"].action' \
-    <(sed -E 's/^\s*\/\/.*$//' "$PLUGIN_DIR/menu.jsonc") 2>/dev/null \
-  | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
-  fail "menu.jsonc routes the row to the plugin overlay"
-pass "menu.jsonc contributes a Cursor Style row for the enabled plugin"
+# The size list feeds the picker; the custom entry is appended by the overlay
+# itself, so the list keeps emitting standard sizes only.
+rg -q "Custom size" "$PLUGIN_DIR/CursorStyle.qml" &&
+  rg -q "omarchy-cursor-size-custom" "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "overlay adds a custom size entry that routes to the custom script"
+pass "overlay adds a custom size entry"
+
+# The overlay self-installs its menu row so the picker survives core upgrades.
+rg -q 'omarchy-cursor-menu-install' "$PLUGIN_DIR/CursorStyle.qml" &&
+  rg -q 'Component.onCompleted' "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "overlay self-installs the menu row on load"
+pass "overlay self-installs the menu row on load"
+
+# The menu row installer writes into the user menu extension file.
+EXT="$tmp_dir/home/.config/omarchy/extensions/omarchy-menu.jsonc"
+mkdir -p "$(dirname "$EXT")"
+export OMARCHY_MENU_EXTENSION="$EXT"
+
+cat >"$EXT" <<'EOF'
+{
+  // pre-existing rows
+  "personal": {"icon":"","label":"Personal"}
+}
+EOF
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
+jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
+  fail "menu installer adds the Cursor Style row"
+jq -r '.["personal"].label' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'Personal' ||
+  fail "menu installer preserves existing rows"
+pass "menu installer adds the row and keeps existing content"
+
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
+[[ $(rg -c '"style.cursor-style"' "$EXT") == "1" ]] ||
+  fail "menu installer is idempotent"
+pass "menu installer is idempotent"
+
+cat >"$EXT" <<'EOF'
+{
+  "style.cursor-style": {"icon":"󰇀","label":"My Cursor","action":"echo custom"}
+}
+EOF
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
+jq -r '.["style.cursor-style"].action' "$EXT" | rg -qx 'echo custom' ||
+  fail "menu installer never clobbers a user-defined row"
+pass "menu installer keeps a user-defined row"
+
+rm -f "$EXT"
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
+[[ -f $EXT ]] &&
+  jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
+  fail "menu installer creates the file when missing"
+pass "menu installer creates the extension file when missing"
 
 echo "all tests passed"
