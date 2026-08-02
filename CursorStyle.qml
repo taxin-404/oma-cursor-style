@@ -59,7 +59,7 @@ Item {
 
   function listScript() {
     if (root.sizeMode)
-      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); { " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done; printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\"; }"
+      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); { printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\"; " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done; }"
     return "current=$(" + root.tool("omarchy-cursor-current") + " 2>/dev/null); " + root.tool("omarchy-cursor-list") + " 2>/dev/null | while read -r c; do [[ -z $c ]] && continue; printf '%s\\t%s\\t%s\\n' \"$c\" \"$c\" \"$current\"; done"
   }
 
@@ -184,8 +184,14 @@ Item {
         if (isCurrent) current = value
         model.append({ label: label, value: value, current: isCurrent })
       }
-      root.currentValue = current
-      root.rebuildDisplay()
+        root.currentValue = current
+        for (var k = 0; k < model.count; k++) {
+          if (model.get(k).value === current) {
+            root.selectedIndex = k
+            break
+          }
+        }
+        root.rebuildDisplay()
     }
   }
 
