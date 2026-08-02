@@ -83,12 +83,6 @@ Summon the picker:
 omarchy-shell shell toggle taxin.cursor-style
 ```
 
-Bind a key in `~/.config/hypr/hyprland.lua`:
-
-```lua
-bind = $mainMod, C, exec, omarchy-shell shell toggle taxin.cursor-style
-```
-
 ## Standalone scripts
 
 The `bin/` scripts work without the plugin or the Omarchy CLI. They resolve
