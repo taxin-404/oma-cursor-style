@@ -7,6 +7,8 @@ Everything the picker needs is bundled in this plugin: the QML overlay, the
 cursor discovery/apply scripts under `bin/`, and the tests under `test/`. There
 is no dependency on Omarchy source — any Omarchy user can install it.
 
+License: [MIT](LICENSE).
+
 ## Features
 
 - Searchable overlay (themed like the menu) with `Theme` / `Size` modes (Tab to
@@ -34,6 +36,44 @@ removing the plugin takes the row back out automatically, and re-enabling
 restores it. The row's action points at a companion entry script copied into
 the same extensions directory, so a row that is ever left behind cleans itself
 up the next time it is clicked.
+
+## Uninstalling
+
+```sh
+omarchy plugin remove taxin.cursor-style --yes
+```
+
+This disables the plugin, removes it from the shell, and deletes its menu row
+from the user menu extension. If a row is ever left behind, remove it manually:
+
+```sh
+omarchy-cursor-menu-install --remove
+```
+
+## Dependencies
+
+Runtime requirements, all standard on an Omarchy desktop:
+
+- Hyprland — applies the cursor via `hyprctl setcursor` and persists the choice
+  in `hl.env` inside `hyprland.lua`.
+- GTK toolset — keeps `settings.ini` / `gsettings` in sync with the theme and
+  size.
+- Omarchy runtime — `omarchy-menu-input`, `omarchy-notification-send`, and
+  `omarchy-hook` provide the size prompt and apply notifications.
+- Hyprcursor / X11 cursor themes — listed from system and user icon dirs.
+
+Nothing external is vendored, and the plugin degrades gracefully (no
+notifications, no crash) when the Omarchy runtime is absent. Cursor themes
+themselves are not bundled; install the themes you want from your distro.
+
+## What the plugin writes
+
+Enabling the plugin only **adds** one row to the user menu extension
+(`~/.config/omarchy/extensions/omarchy-menu.jsonc`); it never overwrites an
+existing row or any other user configuration. Applying a theme or size changes
+the cursor settings (`hl.env`, GTK `settings.ini` / `gsettings`) — and only
+happens when you explicitly pick a theme or type a size. Enabling or disabling
+the plugin itself never changes your cursor.
 
 ## Usage
 
