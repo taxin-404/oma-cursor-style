@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# omarchy:summary=Open the Cursor Style picker, or clean up its menu row
+# omarchy:group=cursor
+#
+# Companion to the cursor-style plugin's menu row. It is copied into the user
+# config (~/.config/omarchy/extensions/) when the plugin installs its row, so
+# it keeps working after the plugin is disabled or removed. With the plugin
+# enabled it opens the picker; otherwise it takes the stale Style > Cursor
+# Style row back out of the user menu extension.
+
+set -euo pipefail
+
+PLUGIN_ID='taxin.cursor-style'
+EXT="${OMARCHY_MENU_EXTENSION:-$HOME/.config/omarchy/extensions/omarchy-menu.jsonc}"
+ROW_ID='style.cursor-style'
+
+MODE=open
+case "${1:-}" in
+  --remove|--uninstall)
+    MODE=remove
+    ;;
+  -h|--help)
+    echo "Usage: omarchy-cursor-menu-entry [--remove]"
+    exit 0
+    ;;
+esac
+
+if [[ $MODE == open ]]; then
+  if omarchy-plugin-list 2>/dev/null | awk -v id="$PLUGIN_ID" '$1 == id { print $2 }' | grep -qx 'enabled'; then
+    exec omarchy-shell shell toggle "$PLUGIN_ID"
+  fi
+  # Plugin is disabled or gone: fall through and remove the stale row.
+fi
+
+[[ -f $EXT ]] || exit 0
+line=$(grep -n "\"$ROW_ID\"" "$EXT" | head -n1 | cut -d: -f1 || true)
+[[ -n $line ]] || exit 0
+
+# Only take back rows this plugin owns (its own entry script, or the older
+# direct toggle action); a user-redefined row is left alone.
+rowline=$(sed -n "${line}p" "$EXT")
+if [[ $rowline != *omarchy-cursor-menu-entry* && $rowline != *taxin.cursor-style* ]]; then
+  exit 0
+fi
+
+sed -i "${line}d" "$EXT"
+
+# If the removed row was the last entry, the preceding entry must drop its
+# trailing comma. It was last only when everything after the removed position
+# is blank, a comment, or the closing brace.
+last_entry=1
+if (( line <= $(wc -l < "$EXT") )); then
+  after=$(sed -n "${line}p" "$EXT")
+  trimmed_after=$(printf '%s' "$after" | sed 's@^[[:space:]]*@@')
+  if [[ -n $trimmed_after && ${trimmed_after:0:1} != "}" && ${trimmed_after:0:1} != "/" ]]; then
+    last_entry=0
+  fi
+fi
+
+if (( last_entry )); then
+  prev=$((line - 1))
+  while (( prev > 0 )); do
+    content=$(sed -n "${prev}p" "$EXT")
+    trimmed=$(printf '%s' "$content" | sed 's@^[[:space:]]*@@')
+    if [[ -n $trimmed && ${trimmed:0:1} != "/" ]]; then
+      break
+    fi
+    prev=$((prev - 1))
+  done
+  if (( prev > 0 )); then
+    last_trimmed=$(printf '%s' "$(sed -n "${prev}p" "$EXT")" | sed 's@[[:space:]]*$@@')
+    if [[ $last_trimmed != "{" && ${last_trimmed: -1} == "," ]]; then
+      sed -i "${prev}s/,$//" "$EXT"
+    fi
+  fi
+fi
+
+if [[ $MODE == open ]]; then
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send -u normal "Cursor Style" "Plugin is disabled — entry removed" -t 4000 >/dev/null 2>&1 || true
+  fi
+fi

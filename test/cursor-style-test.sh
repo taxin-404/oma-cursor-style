@@ -265,6 +265,7 @@ pass "overlay self-installs the menu row on load"
 EXT="$tmp_dir/home/.config/omarchy/extensions/omarchy-menu.jsonc"
 mkdir -p "$(dirname "$EXT")"
 export OMARCHY_MENU_EXTENSION="$EXT"
+ENTRY="$(dirname "$EXT")/omarchy-cursor-menu-entry"
 
 cat >"$EXT" <<'EOF'
 {
@@ -273,8 +274,10 @@ cat >"$EXT" <<'EOF'
 }
 EOF
 "$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
-jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
+jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx '.*omarchy-cursor-menu-entry' ||
   fail "menu installer adds the Cursor Style row"
+[[ -f $ENTRY ]] && [[ -x $ENTRY ]] ||
+  fail "menu installer copies the entry script into the user config"
 jq -r '.["personal"].label' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'Personal' ||
   fail "menu installer preserves existing rows"
 pass "menu installer adds the row and keeps existing content"
@@ -297,15 +300,17 @@ pass "menu installer keeps a user-defined row"
 rm -f "$EXT"
 "$PLUGIN_DIR/bin/omarchy-cursor-menu-install"
 [[ -f $EXT ]] &&
-  jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
+  jq -r '.["style.cursor-style"].action' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx '.*omarchy-cursor-menu-entry' ||
   fail "menu installer creates the file when missing"
 pass "menu installer creates the extension file when missing"
 
 # The overlay removes its menu row when it is unloaded, so disabling or
-# deleting the plugin leaves no dead entry.
+# deleting the plugin leaves no dead entry. Cleanup runs through the entry
+# script copied into the user config so it survives plugin removal.
 rg -q 'onDestruction' "$PLUGIN_DIR/CursorStyle.qml" &&
-  rg -q -- '--remove' "$PLUGIN_DIR/bin/omarchy-cursor-menu-install" ||
-  fail "overlay removes its menu row when unloaded"
+  rg -q 'omarchy-cursor-menu-entry' "$PLUGIN_DIR/CursorStyle.qml" &&
+  rg -q -- '--remove' "$PLUGIN_DIR/bin/omarchy-cursor-menu-entry" ||
+  fail "overlay removes its menu row via the persistent entry script"
 pass "overlay removes its menu row when unloaded"
 
 # --remove takes back the plugin's own row while keeping other rows and comments.
@@ -313,7 +318,7 @@ cat >"$EXT" <<'EOF'
 {
   // pre-existing rows
   "personal": {"icon":"","label":"Personal"},
-  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"omarchy-shell shell toggle taxin.cursor-style"}
+  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"/home/taxin/.config/omarchy/extensions/omarchy-cursor-menu-entry"}
 }
 EOF
 "$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
@@ -342,7 +347,7 @@ pass "menu installer --remove leaves a user-defined row"
 cat >"$EXT" <<'EOF'
 {
   "personal": {"icon":"","label":"Personal"},
-  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"omarchy-shell shell toggle taxin.cursor-style"},
+  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"/home/taxin/.config/omarchy/extensions/omarchy-cursor-menu-entry"},
   "style.foo": {"icon":"󰇀","label":"Foo","action":"echo foo"}
 }
 EOF

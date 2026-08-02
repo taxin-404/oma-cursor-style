@@ -506,10 +506,12 @@ Item {
   }
 
   // Disabling or deleting the plugin destroys this overlay, so take the menu
-  // row back out at the same time; enabling re-adds it via onCompleted.
+  // row back out at the same time; enabling re-adds it via onPluginBinChanged.
+  // The cleanup runs through the entry script copied into the user config,
+  // not this plugin's own bin/, so it survives the plugin being removed.
   Component.onDestruction: {
-    if (root.pluginBin) {
-      Util.execDetached(root.tool("omarchy-cursor-menu-install") + " --remove")
-    }
+    var ext = Quickshell.env("OMARCHY_MENU_EXTENSION")
+    var dir = ext ? String(ext).replace(/\/[^\/]*$/, "") : Quickshell.env("HOME") + "/.config/omarchy/extensions"
+    Util.execDetached(Util.shellQuote(dir + "/omarchy-cursor-menu-entry") + " --remove")
   }
 }
