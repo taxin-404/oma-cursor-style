@@ -173,4 +173,12 @@ for script in \
 done
 pass "all bundled scripts are executable"
 
+# The menu.jsonc contribution is what makes `omarchy plugin enable` surface the
+# picker under Style. It must parse and target the plugin overlay.
+jq -r '.["style.cursor-style"].action' \
+    <(sed -E 's/^\s*\/\/.*$//' "$PLUGIN_DIR/menu.jsonc") 2>/dev/null \
+  | rg -qx 'omarchy-shell shell toggle taxin.cursor-style' ||
+  fail "menu.jsonc routes the row to the plugin overlay"
+pass "menu.jsonc contributes a Cursor Style row for the enabled plugin"
+
 echo "all tests passed"

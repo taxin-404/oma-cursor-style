@@ -24,6 +24,11 @@ omarchy plugin add https://github.com/taxin-404/oma-cursor-style.git
 omarchy plugin enable taxin.cursor-style
 ```
 
+Enabling the plugin also adds a **Style › Cursor Style** row to the Omarchy
+menu (via the plugin's `menu.jsonc`), so no menu config is needed. On an
+Omarchy build without plugin menu-contribution support, add the row manually
+(see below).
+
 ## Usage
 
 Summon the picker:
@@ -38,7 +43,7 @@ Bind a key in `~/.config/hypr/hyprland.lua`:
 bind = $mainMod, C, exec, omarchy-shell shell toggle taxin.cursor-style
 ```
 
-### Optional: menu entry
+### Manual menu entry (older Omarchy builds)
 
 Add the picker to the Omarchy menu by dropping this into
 `~/.config/omarchy/extensions/omarchy-menu.jsonc` (create the file if needed):
@@ -73,6 +78,7 @@ bin/omarchy-cursor-open              # open the picker (needs the plugin)
 
 ```
 manifest.json       plugin manifest (id taxin.cursor-style, overlay)
+menu.jsonc          Style > Cursor Style menu row (merged when enabled)
 CursorStyle.qml     overlay entry point
 bin/                cursor scripts (self-contained)
 test/               standalone test suite
