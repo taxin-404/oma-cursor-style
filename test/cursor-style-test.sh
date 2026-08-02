@@ -180,6 +180,10 @@ if omarchy-cursor-size-custom; then
 fi
 pass "custom size aborts when the prompt is cancelled"
 
+rg -q 'current: \$current' "$PLUGIN_DIR/bin/omarchy-cursor-size-custom" ||
+  fail "custom size prompt hints at the current size"
+pass "custom size prompt hints at the current size"
+
 omarchy-cursor-set Fake-Dark
 
 [[ $(tail -n 1 "$HYPRCTL_LOG") == "setcursor Fake-Dark 55" ]] ||
@@ -226,12 +230,26 @@ for script in \
 done
 pass "all bundled scripts are executable"
 
-# The size list feeds the picker; the custom entry is appended by the overlay
+# The size list feeds the picker; the custom entry is prepended by the overlay
 # itself, so the list keeps emitting standard sizes only.
 rg -q "Custom size" "$PLUGIN_DIR/CursorStyle.qml" &&
   rg -q "omarchy-cursor-size-custom" "$PLUGIN_DIR/CursorStyle.qml" ||
   fail "overlay adds a custom size entry that routes to the custom script"
 pass "overlay adds a custom size entry"
+
+# The custom entry is flagged as the active size when the current size is not
+# a preset, and the picker surfaces the active size in its header.
+rg -q 'grep -qx' "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "size list flags the custom row when the active size is not a preset"
+pass "size list flags the custom row when the active size is not a preset"
+
+rg -q 'parts\[3\]' "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "size list parser honours the custom-active flag"
+pass "size list parser honours the custom-active flag"
+
+rg -q 'Current: ' "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "picker shows the active size in the header"
+pass "picker shows the active size in the header"
 
 # The overlay self-installs its menu row so the picker survives core upgrades.
 rg -q 'omarchy-cursor-menu-install' "$PLUGIN_DIR/CursorStyle.qml" &&

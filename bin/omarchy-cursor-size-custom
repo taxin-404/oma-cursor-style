@@ -18,12 +18,20 @@ esac
 # on any install regardless of PATH.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Hint at the current size when one is known, so the typed value has context.
+current=""
+if [[ -x "$SCRIPT_DIR/omarchy-cursor-size-current" ]]; then
+  current=$("$SCRIPT_DIR/omarchy-cursor-size-current" 2>/dev/null)
+fi
+prompt="Cursor size (px)"
+[[ $current =~ ^[0-9]+$ ]] && prompt="Cursor size (px) — current: $current"
+
 # Prompt through the Omarchy menu input when the runtime is available, and fall
 # back to a plain terminal read so the script still works standalone.
 if command -v omarchy-menu-input >/dev/null 2>&1; then
-  value=$(omarchy-menu-input "Cursor size (px)" --width 400) || exit 1
+  value=$(omarchy-menu-input "$prompt" --width 400) || exit 1
 else
-  read -rp "Cursor size (px): " value || exit 1
+  read -rp "$prompt: " value || exit 1
 fi
 
 if [[ ! $value =~ ^[0-9]+$ ]] || (( value < 1 )); then

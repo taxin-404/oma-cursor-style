@@ -59,7 +59,7 @@ Item {
 
   function listScript() {
     if (root.sizeMode)
-      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); { printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\"; " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done; }"
+      return "current=$(" + root.tool("omarchy-cursor-size-current") + " 2>/dev/null); { " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | grep -qx \"$current\" && printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\" || printf '%s\\t%s\\t%s\\n' 'Custom size' 'custom' \"$current\" '1'; " + root.tool("omarchy-cursor-size-list") + " 2>/dev/null | while read -r s; do [[ -z $s ]] && continue; printf '%s\\t%s\\t%s\\n' \"$s\" \"$s\" \"$current\"; done; }"
     return "current=$(" + root.tool("omarchy-cursor-current") + " 2>/dev/null); " + root.tool("omarchy-cursor-list") + " 2>/dev/null | while read -r c; do [[ -z $c ]] && continue; printf '%s\\t%s\\t%s\\n' \"$c\" \"$c\" \"$current\"; done"
   }
 
@@ -136,7 +136,7 @@ Item {
     if (root.sizeMode) {
       if (row.value === "custom") {
         Util.execDetached(root.tool("omarchy-cursor-size-custom"))
-        root.reload()
+        customReloadTimer.restart()
         return
       }
       Util.execDetached(root.tool("omarchy-cursor-size-set") + " " + Util.shellQuote(row.value))
@@ -180,8 +180,8 @@ Item {
         if (parts.length < 2) continue
         var label = parts[0]
         var value = parts[1]
-        var isCurrent = parts.length > 2 && parts[2] === value
-        if (isCurrent) current = value
+        var isCurrent = parts.length > 2 && (parts[2] === value || (parts.length > 3 && parts[3] === "1"))
+        if (isCurrent) current = parts[2]
         model.append({ label: label, value: value, current: isCurrent })
       }
         root.currentValue = current
@@ -193,6 +193,15 @@ Item {
         }
         root.rebuildDisplay()
     }
+  }
+
+  // The custom-size script applies asynchronously; reload shortly after it is
+  // launched so the list and readout pick up the newly persisted size.
+  Timer {
+    id: customReloadTimer
+    interval: 500
+    repeat: false
+    onTriggered: root.reload()
   }
 
   PanelWindow {
@@ -280,6 +289,7 @@ Item {
           height: root.headerHeight
 
           Text {
+            id: title
             text: "Cursor Style"
             color: root.foreground
             font.family: root.fontFamily
@@ -289,7 +299,24 @@ Item {
             elide: Text.ElideRight
           }
 
+          Text {
+            visible: root.currentValue !== ""
+            text: root.sizeMode ? ("Current: " + root.currentValue + "px") : ("Current: " + root.currentValue)
+            color: root.foreground
+            opacity: 0.55
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.title
+            elide: Text.ElideRight
+            horizontalAlignment: Text.AlignRight
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: title.right
+            anchors.leftMargin: Style.space(8)
+            anchors.right: modeRow.left
+            anchors.rightMargin: Style.space(8)
+          }
+
           Row {
+            id: modeRow
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
             spacing: Style.space(4)
