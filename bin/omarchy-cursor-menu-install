@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy:summary=Install the Cursor Style row into the Omarchy menu
+# omarchy:summary=Install or remove the Cursor Style row in the Omarchy menu
 # omarchy:group=menu
 #
 # Adds the Style > Cursor Style row to the user menu extension
@@ -10,14 +10,20 @@
 #
 # Idempotent: never touches an existing row with the same id, so a user (or
 # another source) that already defines style.cursor-style keeps its version.
+#
+# `--remove` takes the row back out. It only removes a row that references the
+# plugin (action contains taxin.cursor-style); a user-redefined row is left
+# alone, and other rows and comments are preserved.
 
 set -euo pipefail
 
 EXT="${OMARCHY_MENU_EXTENSION:-$HOME/.config/omarchy/extensions/omarchy-menu.jsonc}"
 ROW_ID='style.cursor-style'
 
+MODE=install
+
 usage() {
-  echo "Usage: omarchy-cursor-menu-install"
+  echo "Usage: omarchy-cursor-menu-install [--remove]"
 }
 
 case "${1:-}" in
@@ -25,11 +31,24 @@ case "${1:-}" in
     usage
     exit 0
     ;;
+  --remove|--uninstall)
+    MODE=remove
+    ;;
+  "")
+    ;;
+  *)
+    echo "omarchy-cursor-menu-install: unknown option: $1" >&2
+    usage >&2
+    exit 1
+    ;;
 esac
 
 mkdir -p "$(dirname "$EXT")"
 
 if [[ ! -f $EXT ]]; then
+  if [[ $MODE == remove ]]; then
+    exit 0
+  fi
   cat >"$EXT" <<EOF
 {
   // Rows added by the cursor-style plugin so the picker is reachable from the
@@ -43,10 +62,56 @@ fi
 # Strip //-style comments for analysis only; never rewrite the original bytes.
 stripped=$(sed -E 's@^\s*//.*@@' "$EXT")
 
-# Already present? Leave it alone.
 if printf '%s\n' "$stripped" | grep -q "\"$ROW_ID\""; then
+  present=1
+else
+  present=0
+fi
+
+if [[ $MODE == remove ]]; then
+  (( present )) || exit 0
+  line=$(grep -n "\"$ROW_ID\"" "$EXT" | head -n1 | cut -d: -f1)
+  rowline=$(sed -n "${line}p" "$EXT")
+  # Only take back rows this plugin owns; a user-redefined row stays.
+  if [[ $rowline != *taxin.cursor-style* ]]; then
+    exit 0
+  fi
+  sed -i "${line}d" "$EXT"
+
+  # If the removed row was the last entry, the preceding entry must drop its
+  # trailing comma. It was last only when everything after the removed position
+  # is blank, a comment, or the closing brace.
+  last_entry=1
+  if (( line <= $(wc -l < "$EXT") )); then
+    after=$(sed -n "${line}p" "$EXT")
+    trimmed_after=$(printf '%s' "$after" | sed 's@^[[:space:]]*@@')
+    if [[ -n $trimmed_after && ${trimmed_after:0:1} != "}" && ${trimmed_after:0:1} != "/" ]]; then
+      last_entry=0
+    fi
+  fi
+
+  if (( last_entry )); then
+    prev=$((line - 1))
+    while (( prev > 0 )); do
+      content=$(sed -n "${prev}p" "$EXT")
+      trimmed=$(printf '%s' "$content" | sed 's@^[[:space:]]*@@')
+      if [[ -n $trimmed && ${trimmed:0:1} != "/" ]]; then
+        break
+      fi
+      prev=$((prev - 1))
+    done
+    if (( prev > 0 )); then
+      last_trimmed=$(printf '%s' "$(sed -n "${prev}p" "$EXT")" | sed 's@[[:space:]]*$@@')
+      if [[ $last_trimmed != "{" && ${last_trimmed: -1} == "," ]]; then
+        sed -i "${prev}s/,$//" "$EXT"
+      fi
+    fi
+  fi
   exit 0
 fi
+
+# Install: an existing row is left alone.
+(( present )) && exit 0
 
 row='  "'"$ROW_ID"'": {"icon":"󰇀","label":"Cursor Style","aliases":["cursor","cursor-picker"],"action":"omarchy-shell shell toggle taxin.cursor-style"}'
 

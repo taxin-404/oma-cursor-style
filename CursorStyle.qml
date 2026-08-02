@@ -500,4 +500,12 @@ Item {
       Util.execDetached(root.tool("omarchy-cursor-menu-install"))
     }
   }
+
+  // Disabling or deleting the plugin destroys this overlay, so take the menu
+  // row back out at the same time; enabling re-adds it via onCompleted.
+  Component.onDestruction: {
+    if (root.pluginBin) {
+      Util.execDetached(root.tool("omarchy-cursor-menu-install") + " --remove")
+    }
+  }
 }

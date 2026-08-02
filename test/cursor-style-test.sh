@@ -301,4 +301,59 @@ rm -f "$EXT"
   fail "menu installer creates the file when missing"
 pass "menu installer creates the extension file when missing"
 
+# The overlay removes its menu row when it is unloaded, so disabling or
+# deleting the plugin leaves no dead entry.
+rg -q 'onDestruction' "$PLUGIN_DIR/CursorStyle.qml" &&
+  rg -q -- '--remove' "$PLUGIN_DIR/bin/omarchy-cursor-menu-install" ||
+  fail "overlay removes its menu row when unloaded"
+pass "overlay removes its menu row when unloaded"
+
+# --remove takes back the plugin's own row while keeping other rows and comments.
+cat >"$EXT" <<'EOF'
+{
+  // pre-existing rows
+  "personal": {"icon":"","label":"Personal"},
+  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"omarchy-shell shell toggle taxin.cursor-style"}
+}
+EOF
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
+rg -q '"style.cursor-style"' "$EXT" &&
+  fail "menu installer --remove takes back the plugin row"
+jq -r '.["personal"].label' <(sed -E 's@^\s*//.*@@' "$EXT") | rg -qx 'Personal' ||
+  fail "menu installer --remove preserves other rows"
+pass "menu installer --remove takes back the row and keeps other content"
+
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
+[[ -f $EXT ]] || fail "menu installer --remove is a no-op when already gone"
+pass "menu installer --remove is idempotent"
+
+# A user-redefined row (no plugin action) is left alone.
+cat >"$EXT" <<'EOF'
+{
+  "style.cursor-style": {"icon":"󰇀","label":"My Cursor","action":"echo custom"}
+}
+EOF
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
+jq -r '.["style.cursor-style"].action' "$EXT" | rg -qx 'echo custom' ||
+  fail "menu installer --remove leaves a user-defined row"
+pass "menu installer --remove leaves a user-defined row"
+
+# Removing a middle row keeps the file valid JSON.
+cat >"$EXT" <<'EOF'
+{
+  "personal": {"icon":"","label":"Personal"},
+  "style.cursor-style": {"icon":"󰇀","label":"Cursor Style","action":"omarchy-shell shell toggle taxin.cursor-style"},
+  "style.foo": {"icon":"󰇀","label":"Foo","action":"echo foo"}
+}
+EOF
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
+jq -e '.personal and .["style.foo"] and (has("style.cursor-style") | not)' "$EXT" ||
+  fail "menu installer --remove handles a middle row"
+pass "menu installer --remove handles a middle row"
+
+rm -f "$EXT"
+"$PLUGIN_DIR/bin/omarchy-cursor-menu-install" --remove
+[[ ! -e $EXT ]] || fail "menu installer --remove does not create the file"
+pass "menu installer --remove is a no-op when the file is missing"
+
 echo "all tests passed"

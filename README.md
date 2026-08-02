@@ -29,8 +29,10 @@ omarchy plugin enable taxin.cursor-style
 Enabling the plugin self-installs a **Style › Cursor Style** row into
 `~/.config/omarchy/extensions/omarchy-menu.jsonc`, so the picker is reachable
 from the Omarchy menu with no manual config. The row lives in your user config
-(not the shipped defaults), so it survives Omarchy upgrades. Disabling the
-plugin leaves the row behind; delete it from that file to remove the entry.
+(not the shipped defaults), so it survives Omarchy upgrades. Disabling or
+removing the plugin takes the row back out automatically, and re-enabling
+restores it. A row you redefined yourself (its `action` no longer references
+the plugin) is left alone.
 
 ## Usage
 
@@ -60,6 +62,7 @@ bin/omarchy-cursor-size-current      # current size
 bin/omarchy-cursor-size-set <px>     # apply + persist a size
 bin/omarchy-cursor-size-custom       # prompt for any size and apply it
 bin/omarchy-cursor-menu-install      # ensure the Style > Cursor Style menu row
+bin/omarchy-cursor-menu-install --remove  # take the row back out
 bin/omarchy-cursor-open              # open the picker (needs the plugin)
 ```
 
