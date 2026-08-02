@@ -257,7 +257,7 @@ pass "picker moves the active-size marker instantly on selection"
 
 # The overlay self-installs its menu row so the picker survives core upgrades.
 rg -q 'omarchy-cursor-menu-install' "$PLUGIN_DIR/CursorStyle.qml" &&
-  rg -q 'Component.onCompleted' "$PLUGIN_DIR/CursorStyle.qml" ||
+  rg -q 'onPluginBinChanged' "$PLUGIN_DIR/CursorStyle.qml" ||
   fail "overlay self-installs the menu row on load"
 pass "overlay self-installs the menu row on load"
 

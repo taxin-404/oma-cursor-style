@@ -495,8 +495,12 @@ Item {
   // Self-install the menu row into the user's menu extension. The plugin owns
   // its menu entry so it survives core upgrades; keepLoaded mounts this overlay
   // at shell startup, so the row appears as soon as the plugin is enabled.
-  Component.onCompleted: {
-    if (root.pluginBin) {
+  // pluginBin is only known once the shell has handed us the manifest, so run
+  // this from its change handler rather than Component.onCompleted.
+  property bool menuRowInstalled: false
+  onPluginBinChanged: {
+    if (!root.menuRowInstalled && root.pluginBin) {
+      root.menuRowInstalled = true
       Util.execDetached(root.tool("omarchy-cursor-menu-install"))
     }
   }
