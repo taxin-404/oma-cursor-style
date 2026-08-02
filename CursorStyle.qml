@@ -144,7 +144,15 @@ Item {
       Util.execDetached(root.tool("omarchy-cursor-set") + " " + Util.shellQuote(row.value))
     }
     root.currentValue = row.value
+    root.markCurrent(row.value)
     root.rebuildDisplay()
+  }
+
+  function markCurrent(newValue) {
+    for (var m = 0; m < model.count; m++) {
+      var item = model.get(m)
+      model.set(m, { label: item.label, value: item.value, current: item.value === newValue })
+    }
   }
 
   function switchMode(next) {

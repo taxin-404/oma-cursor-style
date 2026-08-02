@@ -251,6 +251,10 @@ rg -q 'Current: ' "$PLUGIN_DIR/CursorStyle.qml" ||
   fail "picker shows the active size in the header"
 pass "picker shows the active size in the header"
 
+rg -q 'markCurrent' "$PLUGIN_DIR/CursorStyle.qml" ||
+  fail "picker moves the active-size marker instantly on selection"
+pass "picker moves the active-size marker instantly on selection"
+
 # The overlay self-installs its menu row so the picker survives core upgrades.
 rg -q 'omarchy-cursor-menu-install' "$PLUGIN_DIR/CursorStyle.qml" &&
   rg -q 'Component.onCompleted' "$PLUGIN_DIR/CursorStyle.qml" ||
